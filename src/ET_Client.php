@@ -3,7 +3,7 @@
 namespace FuelSdk;
 
 use \RobRichards\WsePhp\WSSESoap;
-use \Firebase\JWT;
+use \Firebase\JWT\JWT;
 
 use \Datetime;
 use \SoapClient;
@@ -65,8 +65,8 @@ class ET_Client extends SoapClient
 	 */
 	public $baseUrl;
 
-	private $wsdlLoc, $debugSOAP, $lastHTTPCode, $clientId, 
-			$clientSecret, $appsignature, $endpoint, 
+	private $wsdlLoc, $debugSOAP, $lastHTTPCode, $client_id, 
+			$client_secret, $appsignature, $endpoint, 
 			$tenantTokens, $tenantKey, $xmlLoc, $baseAuthUrl, $baseSoapUrl, $useOAuth2Authentication, $accountId, $scope;
 
 	private $defaultBaseSoapUrl = 'https://webservice.exacttarget.com/Service.asmx';
@@ -107,8 +107,8 @@ class ET_Client extends SoapClient
 		if ($config)
 		{
 			$this->wsdlLoc = $config['defaultwsdl'];
-			$this->clientId = $config['clientid'];
-			$this->clientSecret = $config['clientsecret'];
+			$this->client_id = $config['clientid'];
+			$this->client_secret = $config['clientsecret'];
 			$this->appsignature = $config['appsignature'];
 			$this->baseAuthUrl = $config["baseAuthUrl"];
 			if (array_key_exists('baseSoapUrl', $config)) {
@@ -144,8 +144,8 @@ class ET_Client extends SoapClient
 		{
 			if (array_key_exists('defaultwsdl', $params)){$this->wsdlLoc = $params['defaultwsdl'];}
 			else {$this->wsdlLoc = "https://webservice.exacttarget.com/etframework.wsdl";}
-			if (array_key_exists('clientid', $params)){$this->clientId = $params['clientid'];}
-			if (array_key_exists('clientsecret', $params)){$this->clientSecret = $params['clientsecret'];}
+			if (array_key_exists('clientid', $params)){$this->client_id = $params['clientid'];}
+			if (array_key_exists('clientsecret', $params)){$this->client_secret = $params['clientsecret'];}
 			if (array_key_exists('appsignature', $params)){$this->appsignature = $params['appsignature'];}
 			if (array_key_exists('xmlloc', $params)){$this->xmlLoc = $params['xmlloc'];}
 
@@ -194,7 +194,7 @@ class ET_Client extends SoapClient
 
 		$this->debugSOAP = $debug;
 		
-		if (!property_exists($this,'clientId') || is_null($this->clientId) || !property_exists($this,'clientSecret') || is_null($this->clientSecret)){
+		if (!property_exists($this,'client_id') || is_null($this->client_id) || !property_exists($this,'client_secret') || is_null($this->client_secret)){
 			throw new Exception('clientid or clientsecret is null: Must be provided in config file or passed when instantiating ET_Client');
 		}
 		
@@ -217,7 +217,7 @@ class ET_Client extends SoapClient
 		if ($this->baseSoapUrl) {
             $this->endpoint = $this->baseSoapUrl;
 		} else {
-            $cache = new ET_CacheService($this->clientId, $this->clientSecret);
+            $cache = new ET_CacheService($this->client_id, $this->client_secret);
             $cacheData = $cache->get();
             if (!is_null($cacheData) && $cacheData->url) {
                 $this->endpoint = $cacheData->url;
@@ -289,13 +289,14 @@ class ET_Client extends SoapClient
 			if (is_null($this->getAuthToken($this->tenantKey)) || ($timeDiff < 5) || $forceRefresh  ){
 				
 				$url = $this->tenantKey == null 
-						? $this->baseAuthUrl."/v1/requestToken?legacy=1"
+						? $this->baseAuthUrl."/v2/token?legacy=1"
 						: $this->baseUrl."/provisioning/v1/tenants/{$this->tenantKey}/requestToken?legacy=1";
 						
 				$jsonRequest = new stdClass(); 
-				$jsonRequest->clientId = $this->clientId;
-				$jsonRequest->clientSecret = $this->clientSecret;
+				$jsonRequest->client_id = $this->client_id;
+				$jsonRequest->client_secret = $this->client_secret;
 				$jsonRequest->accessType = "offline";
+				$jsonRequest->grant_type = "client_credentials";
 				if (!is_null($this->getRefreshToken($this->tenantKey))){
 					$jsonRequest->refreshToken = $this->getRefreshToken($this->tenantKey);
 				}
@@ -304,13 +305,13 @@ class ET_Client extends SoapClient
 				//echo "auth:  \n";
 				//print_r($authResponse);
 				
-				if ($authResponse && property_exists($authObject,"accessToken")){		
-					$dv = new DateInterval('PT'.$authObject->expiresIn.'S');
+				if ($authResponse && property_exists($authObject,"access_token")){		
+					$dv = new DateInterval('PT'.$authObject->expires_in.'S');
 					$newexpTime = new DateTime();
-					$this->setAuthToken($this->tenantKey, $authObject->accessToken, $newexpTime->add($dv));
-					$this->setInternalAuthToken($this->tenantKey, $authObject->legacyToken);
-					if (property_exists($authObject,'refreshToken')){
-						$this->setRefreshToken($this->tenantKey, $authObject->refreshToken);
+					$this->setAuthToken($this->tenantKey, $authObject->access_token, $newexpTime->add($dv));
+					$this->setInternalAuthToken($this->tenantKey, $authObject->legacy_token);
+					if (property_exists($authObject,'refresh_token')){
+						$this->setRefreshToken($this->tenantKey, $authObject->refresh_token);
 					}
 				} else {
 					throw new Exception('Unable to validate App Keys(ClientID/ClientSecret) provided, requestToken response:'.$authResponse->body );			
@@ -339,8 +340,8 @@ class ET_Client extends SoapClient
                 $url = $this->baseAuthUrl."/v2/token";
 
                 $jsonRequest = new stdClass();
-                $jsonRequest->client_id = $this->clientId;
-                $jsonRequest->client_secret = $this->clientSecret;
+                $jsonRequest->client_id = $this->client_id;
+                $jsonRequest->client_secret = $this->client_secret;
                 $jsonRequest->grant_type = "client_credentials";
 
                 if ($this->isNullOrEmptyString($this->accountId) == false){
