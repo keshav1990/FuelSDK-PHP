@@ -8,7 +8,7 @@ return array(
     'baseUrl' => 'https://www.exacttargetapis.com',
     'baseAuthUrl' => 'https://auth.exacttargetapis.com',
     'baseSoapUrl' => 'https://webservice.exacttarget.com/Service.asmx',
-    'useOAuth2Authentication' => false,
+    'useOAuth2Authentication' => true,
     'accountId' => <account id>,
     'scope' => '<permissions list>',
     'proxyhost' => 'localhost',
